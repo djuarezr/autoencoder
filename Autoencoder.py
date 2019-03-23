@@ -38,6 +38,8 @@ class autoencoder:
         # Weights and biases
         self.w = {}
         self.b = {}
+        # Dropout placeholder
+        self.drop_ph = tf.placeholder(tf.float32)
         init = tf.initializers.glorot_normal()
         count_lay = 0
         # Weights encoder
@@ -75,13 +77,10 @@ class autoencoder:
             b_i = "b" + str(i)
             self.layers[lay_name1] = tf.matmul(self.layers[lay_name],
                                                self.w[w_i]) + self.b[b_i]
-            if i != enc_node:  # Encoder output won't relu
+            if i != enc_node:  # Encoder output won't relu or dropout
                 self.layers[lay_name1] = tf.nn.relu(self.layers[lay_name1])
-                # Encoder output will not dropout
-                if self.dropout > 0 and i != enc_node:
-                    self.layers[lay_name1] = tf.nn.dropout(
-                        self.layers[lay_name1], rate=dropout
-                    )
+                self.layers[lay_name1] = tf.nn.dropout(self.layers[lay_name1],
+                                                       rate=self.drop_ph)
         # Output layer
         i += 1
         lay_name = "hid" + str(i)
@@ -144,22 +143,31 @@ class autoencoder:
             train_loss = 0
             for b in range(num_batch):
                 x_batch = self.sess.run(next_batch)
-                self.sess.run(self.train, feed_dict={'in_data:0': x_batch})
+                self.sess.run(self.train,
+                              feed_dict={'in_data:0': x_batch,
+                                         self.drop_ph: self.dropout})
                 train_loss += self.sess.run(self.loss,
-                                            feed_dict={"in_data:0": x_batch})
+                                            feed_dict={'in_data:0': x_batch,
+                                                       self.drop_ph:
+                                                       self.dropout})
             if verbose > 0:
                 print("Epoch {} loss {}".format(e, train_loss))
         return
 
     def predict(self, x):
-        return self.sess.run(self.layers["out"], feed_dict={"in_data:0": x})
+        return self.sess.run(self.layers["out"],
+                             feed_dict={'in_data:0': x,
+                                        self.drop_ph: 0.0})
 
     def encode(self, x):
-        return self.sess.run(self.layers["enc"], feed_dict={"in_data:0": x})
+        return self.sess.run(self.layers["enc"],
+                             feed_dict={'in_data:0': x,
+                                        self.drop_ph: 0.0})
 
     def decode(self, x):
         return self.sess.run(self.layers["out"],
-                             feed_dict={self.layers["enc"]: x})
+                             feed_dict={self.layers["enc"]: x,
+                                        self.drop_ph: 0.0})
 
     def __del__(self):
         self.sess.close()
