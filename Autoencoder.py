@@ -92,6 +92,8 @@ class autoencoder:
         # Change names to encoder node
         # It appears at the end of the dictionary; doesn't matter
         self.layers["enc"] = self.layers.pop("hid" + str(enc_node + 1))
+        # # Also to the decoder input (just to create a decoder method)
+        # self.layers["dec"] = self.layers.pop("hid" + str(enc_node + 2))
 
         # Loss computation
         self.loss = tf.reduce_mean(tf.square(self.layers["out"] -
@@ -154,6 +156,10 @@ class autoencoder:
 
     def encode(self, x):
         return self.sess.run(self.layers["enc"], feed_dict={"in_data:0": x})
+
+    def decode(self, x):
+        return self.sess.run(self.layers["out"],
+                             feed_dict={self.layers["enc"]: x})
 
     def __del__(self):
         self.sess.close()
