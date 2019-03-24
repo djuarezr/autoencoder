@@ -40,6 +40,12 @@ class autoencoder:
         # Avoid problems re-using names of the variables
         tf.reset_default_graph()
 
+        if isinstance(self.shape, int) or isinstance(self.shape, np.int32):
+            self.shape = [self.shape]
+        if not isinstance(self.shape, list):
+            print("Shape has to be an int or a list of ints")
+            return
+
         self.lay_shape = [in_shape] + self.shape + [self.code_len]
         # Weights and biases
         self.w = {}
