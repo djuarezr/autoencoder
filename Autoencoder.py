@@ -124,7 +124,7 @@ class autoencoder:
         self.gen_network(X.shape[1])
 
         # Loss computation
-        self.loss = tf.reduce_mean(tf.square(self.y_ph - self.layers["out"]))
+        self.loss = tf.reduce_sum(tf.square(self.y_ph - self.layers["out"]))
         if self.l1 > 0:
             self.l1 = tf.constant(self.l1, tf.float32)
             reg1 = tf.zeros(1, tf.float32)
