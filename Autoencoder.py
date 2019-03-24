@@ -3,7 +3,6 @@ import tensorflow as tf
 
 class autoencoder:
     def __init__(self,
-                 input_shape,
                  code_len,
                  shape=[2],
                  dropout=0.2,
@@ -24,17 +23,23 @@ class autoencoder:
         to the biases.
         """
 
-        # Avoid problems re-using names of the variables
-        tf.reset_default_graph()
-
-        self.input_shape = input_shape
         self.shape = shape
         self.code_len = code_len
         self.dropout = dropout
         self.l1 = l1
         self.l2 = l2
+        return
 
-        self.lay_shape = [self.input_shape] + self.shape + [self.code_len]
+    def gen_network(self, in_shape):
+        """
+        Internal. Generate the network graph. Just to make
+        the class code more readable
+        """
+
+        # Avoid problems re-using names of the variables
+        tf.reset_default_graph()
+
+        self.lay_shape = [in_shape] + self.shape + [self.code_len]
         # Weights and biases
         self.w = {}
         self.b = {}
@@ -65,8 +70,11 @@ class autoencoder:
         # Layers
         self.layers = {}
         self.layers["hid0"] = tf.placeholder(tf.float32,
-                                             shape=[None, input_shape],
+                                             shape=[None, in_shape],
                                              name="in_data")
+        # Placeholder for the output data
+        self.y_ph = tf.placeholder(tf.float32, shape=[None, in_shape],
+                                   name="out_data")
         # Encoder output is from enc_node and enc_node + 1
         enc_node = len(self.lay_shape) - 2
         out_node = 2*len(self.lay_shape) - 2
@@ -91,12 +99,31 @@ class autoencoder:
         # Change names to encoder node
         # It appears at the end of the dictionary; doesn't matter
         self.layers["enc"] = self.layers.pop("hid" + str(enc_node + 1))
-        # # Also to the decoder input (just to create a decoder method)
-        # self.layers["dec"] = self.layers.pop("hid" + str(enc_node + 2))
+        return
+
+    def fit(self, X, y=None, epoch=1000, batch_size=64, verbose=0):
+        """
+        Method to fit the autoencoder.
+
+        - X (2-dimensional numpy array): Input data to fit the autoencoder
+        - y (1-dimensional numpy array): Output data if you want to make
+                                         a denoising autoencoder.
+                                         Default: None (simple autoencoder)
+        - epoch (int): Number of full algorithm iterations
+        - batch_size (int): Samples per weights update
+        - verbose (int): Whether to print loss value each iteration
+        """
+        # Non-denoising Autoencoder
+        if y is None:
+            y = X
+        if X.shape[1] != y.shape[1]:
+            print("X and y must have the same number of variables")
+            return
+
+        self.gen_network(X.shape[1])
 
         # Loss computation
-        self.loss = tf.reduce_mean(tf.square(self.layers["out"] -
-                                             self.layers["hid0"]))
+        self.loss = tf.reduce_mean(tf.square(self.y_ph - self.layers["out"]))
         if self.l1 > 0:
             self.l1 = tf.constant(self.l1, tf.float32)
             reg1 = tf.zeros(1, tf.float32)
@@ -111,64 +138,52 @@ class autoencoder:
             self.loss += self.l2*reg2
 
         # Optimization part
-        optimizer = tf.train.AdamOptimizer()
-        self.train = optimizer.minimize(self.loss)
-        return
+        self.optimizer = tf.train.AdamOptimizer()
+        self.train = self.optimizer.minimize(self.loss)
 
-    def fit(self, x, epoch=1000, batch_size=64, verbose=0):
-        """
-        Method to fit the autoencoder.
-
-        - x (2-dimensional numpy array): Input data to fit the autoencoder
-        - epoch (int): Number of full algorithm iterations
-        - batch_size (int): Samples per weights update
-        - verbose (int): Whether to print loss value each iteration
-        """
-        self.dataset = tf.data.Dataset.from_tensor_slices((x))
-        self.it = self.dataset.repeat().batch(batch_size)
-        self.it = self.it.make_initializable_iterator()
+        # Create iterator
+        dataset = tf.data.Dataset.from_tensor_slices((X, y))
+        it = dataset.repeat().batch(batch_size)
+        it = it.make_initializable_iterator()
 
         # Init global variables and iterator
         self.init = tf.global_variables_initializer()
         self.sess = tf.Session()
         self.sess.run(self.init)
-        self.sess.run(self.it.initializer)
+        self.sess.run(it.initializer)
 
-        num_batch = x.shape[0]//batch_size
+        num_batch = X.shape[0]//batch_size
 
         # Tensorflow complains if we call get_next() inside the training
         # loop, so we create a variable to handle it
-        next_batch = self.it.get_next()
+        next_batch = it.get_next()
         for e in range(epoch):
             train_loss = 0
             for b in range(num_batch):
-                x_batch = self.sess.run(next_batch)
+                X_batch, y_batch = self.sess.run(next_batch)
                 self.sess.run(self.train,
-                              feed_dict={'in_data:0': x_batch,
+                              feed_dict={'in_data:0': X_batch,
+                                         self.y_ph: y_batch,
                                          self.drop_ph: self.dropout})
                 train_loss += self.sess.run(self.loss,
-                                            feed_dict={'in_data:0': x_batch,
-                                                       self.drop_ph:
-                                                       self.dropout})
+                                            feed_dict={'in_data:0': X_batch,
+                                                       self.y_ph: y_batch,
+                                                       self.drop_ph: 0.0})
             if verbose > 0:
                 print("Epoch {} loss {}".format(e, train_loss))
         return
 
-    def predict(self, x):
+    def predict(self, X):
         return self.sess.run(self.layers["out"],
-                             feed_dict={'in_data:0': x,
+                             feed_dict={'in_data:0': X,
                                         self.drop_ph: 0.0})
 
-    def encode(self, x):
+    def encode(self, X):
         return self.sess.run(self.layers["enc"],
-                             feed_dict={'in_data:0': x,
+                             feed_dict={'in_data:0': X,
                                         self.drop_ph: 0.0})
 
-    def decode(self, x):
+    def decode(self, X):
         return self.sess.run(self.layers["out"],
-                             feed_dict={self.layers["enc"]: x,
+                             feed_dict={self.layers["enc"]: X,
                                         self.drop_ph: 0.0})
-
-    def __del__(self):
-        self.sess.close()
-        return
