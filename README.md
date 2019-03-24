@@ -7,7 +7,7 @@ This is my simple implementation of an autoencoder using Tensorflow. It is just 
 ## Features
 
 Currently, it is implemented:
-- As number of layers as your computer supports.
+- As many layers as your computer supports.
 - Dropout.
 - L1 and L2 regularization.
 - It can be a denoising autoencoder.
