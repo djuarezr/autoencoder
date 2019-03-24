@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 
 
@@ -187,3 +188,11 @@ class autoencoder:
         return self.sess.run(self.layers["out"],
                              feed_dict={self.layers["enc"]: X,
                                         self.drop_ph: 0.0})
+
+    def score(self, X, y=None):
+        if y is None:
+            y = X
+        y_pred = self.predict(X)
+        # The minus sign is for making it compatible with scikit-learn
+        # as it always maximizes, and this is the mean squared error
+        return - np.mean(np.sum(np.square(y - y_pred), axis=0))
