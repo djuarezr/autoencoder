@@ -102,7 +102,8 @@ class autoencoder:
         self.layers["enc"] = self.layers.pop("hid" + str(enc_node + 1))
         return
 
-    def fit(self, X, y=None, epoch=1000, batch_size=64, verbose=0):
+    def fit(self, X, y=None, epoch=1000, batch_size=64, verbose=0,
+            patience=0, min_delta=0.0001):
         """
         Method to fit the autoencoder.
 
@@ -113,6 +114,11 @@ class autoencoder:
         - epoch (int): Number of full algorithm iterations
         - batch_size (int): Samples per weights update
         - verbose (int): Whether to print loss value each iteration
+        - patience (int): If > 0, activates early stopping. Number of steps of
+                          non-impoving TRAIN LOSS function after which
+                          training will stop.
+        - min_delta (float): Minimum change in loss to qualify as an
+                             improvement.
         """
         # Non-denoising Autoencoder
         if y is None:
@@ -120,6 +126,9 @@ class autoencoder:
         if X.shape[1] != y.shape[1]:
             print("X and y must have the same number of variables")
             return
+
+        if min_delta < 0.0:
+            min_delta = 0.0
 
         self.gen_network(X.shape[1])
 
@@ -158,6 +167,11 @@ class autoencoder:
         # Tensorflow complains if we call get_next() inside the training
         # loop, so we create a variable to handle it
         next_batch = it.get_next()
+
+        # Tracks the previous loss value for early stopping
+        train_loss1 = 1.0e20
+        patience_cnt = 0  # Counter for early stopping
+
         for e in range(epoch):
             train_loss = 0
             for b in range(num_batch):
@@ -172,6 +186,16 @@ class autoencoder:
                                                        self.drop_ph: 0.0})
             if verbose > 0:
                 print("Epoch {} loss {}".format(e, train_loss))
+
+            # Early stopping
+            if patience > 0:
+                if e > 0 and train_loss1 - train_loss > min_delta:
+                    patience_cnt = 0
+                else:
+                    patience_cnt += 1
+                if patience_cnt > patience:
+                    break
+                train_loss1 = train_loss
         return
 
     def predict(self, X):
@@ -200,7 +224,7 @@ class autoencoder:
     def get_params(self, deep=True):
         return {
             "code_len": self.code_len, "shape": self.shape,
-            "dropout": dropout, "l1": self.l1, "l2": self.l2}
+            "dropout": self.dropout, "l1": self.l1, "l2": self.l2}
 
     def set_params(self, **parameters):
         for parameter, value in parameters.items():
