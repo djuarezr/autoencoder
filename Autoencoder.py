@@ -24,8 +24,8 @@ class autoencoder:
         to the biases.
         """
 
-        self.shape = shape
         self.code_len = code_len
+        self.shape = shape
         self.dropout = dropout
         self.l1 = l1
         self.l2 = l2
@@ -196,3 +196,13 @@ class autoencoder:
         # The minus sign is for making it compatible with scikit-learn
         # as it always maximizes, and this is the mean squared error
         return - np.mean(np.sum(np.square(y - y_pred), axis=0))
+
+    def get_params(self, deep=True):
+        return {
+            "code_len": self.code_len, "shape": self.shape,
+            "dropout": dropout, "l1": self.l1, "l2": self.l2}
+
+    def set_params(self, **parameters):
+        for parameter, value in parameters.items():
+            setattr(self, parameter, value)
+        return self
