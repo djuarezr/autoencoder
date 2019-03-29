@@ -158,7 +158,9 @@ class autoencoder:
         self.train = self.optimizer.minimize(self.loss)
 
         # Create iterator
-        dataset = tf.data.Dataset.from_tensor_slices((X, y))
+        in_ph = tf.placeholder(tf.float32, shape=X.shape)
+        out_ph = tf.placeholder(tf.float32, shape=y.shape)
+        dataset = tf.data.Dataset.from_tensor_slices((in_ph, out_ph))
         it = dataset.repeat().batch(batch_size)
         it = it.make_initializable_iterator()
 
@@ -166,7 +168,9 @@ class autoencoder:
         self.init = tf.global_variables_initializer()
         self.sess = tf.Session()
         self.sess.run(self.init)
-        self.sess.run(it.initializer)
+        self.sess.run(it.initializer, feed_dict={in_ph: X,
+                                                 out_ph: y
+                                                 })
 
         num_batch = X.shape[0]//batch_size
 
