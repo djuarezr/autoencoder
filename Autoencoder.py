@@ -150,7 +150,7 @@ class autoencoder:
             self.l2 = tf.constant(self.l2, tf.float32)
             reg2 = tf.zeros(1, tf.float32)
             for w_ptr in self.w:
-                reg2 += tf.reduce_mean(tf.math.abs(self.w[w_ptr]))
+                reg2 += tf.reduce_mean(tf.math.square(self.w[w_ptr]))
             self.loss += self.l2*reg2
 
         # Optimization part
